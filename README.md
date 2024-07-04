@@ -6,7 +6,9 @@ For now only works on esp32s3 (esp32c3 in the near future).
 
 ## Todo
 - [ ] Fully working library
+- [ ] Partitions macro (to generate PARTITIONS const at compile time)
 - [ ] Other esp32's (like esp32c3, esp32s2, etc..)
+- [ ] Rollbacks
 - [ ] Simple example
 
 ## Resources
