@@ -25,6 +25,7 @@ where
 {
     flash: S,
     ota_offset: Option<u32>,
+    target_partition: Option<usize>,
     flash_size: u32,
     ota_remaining: u32,
 }
@@ -39,6 +40,7 @@ where
         Ota {
             flash,
             ota_offset: None,
+            target_partition: None,
             ota_remaining: 0,
             flash_size: 0,
         }
@@ -49,7 +51,11 @@ where
         let next_part = Self::get_next_ota_partition();
         let ota_offset = next_part.map(|i| PARTITIONS[i].start);
 
-        Ota { ota_offset, ..self }
+        Ota {
+            ota_offset,
+            target_partition: next_part,
+            ..self
+        }
     }
 
     /// Sets the firmware flash size
@@ -91,6 +97,15 @@ where
         *ota_offset += write_size as u32;
         self.ota_remaining -= write_size as u32;
         Ok(self.ota_remaining == 0)
+    }
+
+    // TODO: crc checks or sth
+    pub fn ota_flush(&mut self) -> Result<(), ()> {
+        if let Some(target_partition) = self.target_partition {
+            self.set_target_ota_boot_partition(target_partition);
+        }
+        
+        Ok(())
     }
 
     /// Sets ota boot target partition
