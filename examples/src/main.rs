@@ -92,11 +92,17 @@ async fn main(spawner: Spawner) {
 
     let ip = embassy_net::IpEndpoint::from_str(OTA_SERVER_IP).expect("Wrong ip addr");
     socket.connect(ip).await.expect("Cannot connect!");
+    let mut ota_buff = [0; 4096];
+    socket
+        .read(&mut ota_buff[..4])
+        .await
+        .expect("Cannot read firmware size!");
+    let flash_size = u32::from_le_bytes(ota_buff[..4].try_into().unwrap());
+    log::info!("flash_size: {flash_size}");
 
     let mut ota = Ota::new(FlashStorage::new()).with_next_partition_offset();
-    ota.set_flash_size(535008);
+    ota.set_flash_size(flash_size);
 
-    let mut ota_buff = [0; 1024];
     loop {
         let res = socket.read(&mut ota_buff).await;
         if let Ok(n) = res {
