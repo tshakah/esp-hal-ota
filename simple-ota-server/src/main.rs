@@ -15,7 +15,7 @@ fn main() {
         let buf = (BINARY.len() as u32).to_le_bytes();
         _ = stream.write_all(&buf);
 
-        let chunks = BINARY.chunks(1024);
+        let chunks = BINARY.chunks(4096 * 2);
         let mut buf = [0; 1];
         for chunk in chunks {
             println!("Writing: {}", chunk.len());

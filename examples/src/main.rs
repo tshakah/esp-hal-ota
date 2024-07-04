@@ -5,7 +5,7 @@
 use core::str::FromStr;
 use embassy_executor::Spawner;
 use embassy_net::{tcp::TcpSocket, Config, Stack, StackResources};
-use embassy_time::{Duration, Instant, Timer};
+use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl, peripherals::Peripherals, prelude::*, system::SystemControl,
@@ -39,7 +39,7 @@ async fn main(spawner: Spawner) {
     esp_println::logger::init_logger_from_env();
     log::set_max_level(log::LevelFilter::Info);
 
-    let mut rng = esp_hal::rng::Rng::new(peripherals.RNG);
+    let rng = esp_hal::rng::Rng::new(peripherals.RNG);
     let timer = esp_hal::timer::timg::TimerGroup::new(peripherals.TIMG1, &clocks, None);
     let init = esp_wifi::initialize(
         esp_wifi::EspWifiInitFor::Wifi,
@@ -92,7 +92,7 @@ async fn main(spawner: Spawner) {
 
     let ip = embassy_net::IpEndpoint::from_str(OTA_SERVER_IP).expect("Wrong ip addr");
     socket.connect(ip).await.expect("Cannot connect!");
-    let mut ota_buff = [0; 4096];
+    let mut ota_buff = [0; 4096 * 2];
     socket
         .read(&mut ota_buff[..4])
         .await
@@ -103,19 +103,20 @@ async fn main(spawner: Spawner) {
     let mut ota = Ota::new(FlashStorage::new()).with_next_partition_offset();
     ota.set_flash_size(flash_size);
 
+    let mut bytes_read = 0;
     loop {
         let res = socket.read(&mut ota_buff).await;
         if let Ok(n) = res {
+            bytes_read += n;
             if n == 0 {
                 break;
             }
 
-            let start = Instant::now();
             let res = ota.ota_write_chunk(&ota_buff[..n]);
-            log::info!("ota_write_res: {:?}", res);
-            log::info!("Elapsed: {}", start.elapsed().as_micros());
+            if bytes_read % 4096 * 2 == 0 {
+                _ = socket.write(&[0]).await;
+            }
 
-            _ = socket.write(&[0]).await;
             if res == Ok(true) {
                 _ = ota.ota_flush();
                 break;
@@ -123,6 +124,7 @@ async fn main(spawner: Spawner) {
         }
 
         Timer::after_millis(10).await;
+        log::info!("Progress: {}%", (ota.get_ota_progress() * 100.0) as u8);
     }
 
     loop {

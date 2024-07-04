@@ -72,7 +72,7 @@ where
     /// Writes next firmware chunk
     pub fn ota_write_chunk(&mut self, chunk: &[u8]) -> Result<bool, ()> {
         if self.flash_size == 0 {
-            log::error!("Cant write chunk without set_flash_size()");
+            log::error!("[OTA] Cant write chunk without set_flash_size()");
             return Err(());
         }
 
@@ -88,8 +88,8 @@ where
             .write(*ota_offset, &chunk[..write_size])
             .map_err(|_| ())?;
 
-        log::info!(
-            "Wrote {} bytes to ota partition at 0x{:x}",
+        log::debug!(
+            "[OTA] Wrote {} bytes to ota partition at 0x{:x}",
             write_size,
             ota_offset
         );
@@ -104,7 +104,7 @@ where
         if let Some(target_partition) = self.target_partition {
             self.set_target_ota_boot_partition(target_partition);
         }
-        
+
         Ok(())
     }
 
