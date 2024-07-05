@@ -4,6 +4,12 @@ OTA for esp-hal (no-std).
 ## Limitations
 For now only works on esp32s3 (esp32c3 in the near future).
 
+## Features
+- Obviously OTA updates
+- Dynamic partitions reading (so no macros, no reading from partitions.csv) - fully automatic
+- Checking currently booted partition (using some pointer magic from ESP-IDF)
+- CRC32 verification
+
 ## Example
 This example uses embassy-net for TcpSocket, as you can see ota doesn't use 
 async so you can easily use it with smoltcp.
@@ -43,8 +49,10 @@ loop {
         }
 
         if res == Ok(true) {
-            _ = ota.ota_flush();
-            // Here just reboot or sth!
+            if ota.ota_flush(true).is_ok() {
+                // Here just reboot or sth!
+            }
+
             break;
         }
     }

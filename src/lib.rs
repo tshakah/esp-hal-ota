@@ -9,6 +9,7 @@ pub mod paddr;
 const PART_OFFSET: u32 = 0x8000;
 const PART_SIZE: u32 = 0xc00;
 const FIRST_OTA_PART_SUBTYPE: u8 = 0x10;
+const OTA_VERIFY_READ_SIZE: usize = 256;
 
 #[derive(Clone)]
 pub struct FlashProgress {
@@ -121,8 +122,15 @@ where
         Ok(progress.remaining == 0)
     }
 
-    // TODO: crc checks or sth
-    pub fn ota_flush(&mut self) -> Result<(), ()> {
+    /// verify - should it read flash and check crc
+    pub fn ota_flush(&mut self, verify: bool) -> Result<(), ()> {
+        if verify {
+            if !self.ota_verify()? {
+                log::error!("[OTA] Verify failed! Not flushing...");
+                return Err(()); // verify error
+            }
+        }
+
         let progress = self.progress.clone().ok_or_else(|| ())?; // add error like OtaNotStarted
         if progress.target_crc != progress.last_crc {
             log::warn!("[OTA] Calculated crc: {:?}", progress.last_crc);
@@ -134,6 +142,31 @@ where
 
         self.set_target_ota_boot_partition(progress.target_partition);
         Ok(())
+    }
+
+    /// It reads written flash and checks crc
+    pub fn ota_verify(&mut self) -> Result<bool, ()> {
+        let progress = self.progress.clone().ok_or_else(|| ())?; // add error like OtaNotStarted
+        let mut calc_crc = 0;
+        let mut bytes = [0; OTA_VERIFY_READ_SIZE];
+
+        let mut partition_offset = self.pinfo.ota_partitions[progress.target_partition].0;
+        let mut remaining = progress.flash_size;
+
+        loop {
+            let n = remaining.min(OTA_VERIFY_READ_SIZE as u32);
+            if n == 0 {
+                break;
+            }
+
+            _ = self.flash.read(partition_offset, &mut bytes[..n as usize]);
+            partition_offset += n;
+            remaining -= n;
+
+            calc_crc = crc32::calc_crc32(&bytes[..n as usize], calc_crc);
+        }
+
+        Ok(calc_crc == progress.target_crc)
     }
 
     /// Sets ota boot target partition

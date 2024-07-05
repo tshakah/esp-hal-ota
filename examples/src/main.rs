@@ -126,7 +126,15 @@ async fn main(spawner: Spawner) {
             }
 
             if res == Ok(true) {
-                _ = ota.ota_flush();
+                let res = ota.ota_flush(false);
+                if let Err(e) = res {
+                    log::error!("Ota flush error: {e:?}");
+                    break;
+                }
+
+                log::info!("Ota OK! Rebooting in 1s!");
+                Timer::after_millis(1000).await;
+                esp_hal::reset::software_reset();
                 break;
             }
         }
