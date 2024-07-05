@@ -51,7 +51,10 @@ where
 {
     pub fn new(mut flash: S) -> Result<Self, ()> {
         if let Some(pinfo) = Self::read_partitions(&mut flash) {
-            log::info!("parts: {:?}", &pinfo);
+            if pinfo.ota_partitions_count < 2 {
+                log::error!("Not enough OTA partitions! (>= 2)");
+                return Err(()); // not enough partitions
+            }
 
             return Ok(Ota {
                 flash,
