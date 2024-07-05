@@ -4,7 +4,7 @@ use crate::{crc32, PARTITIONS_COUNT};
 /// Helper funcion!
 /// Change seq to partition number
 pub const fn seq_to_part(seq: u32) -> usize {
-    (PARTITIONS_COUNT - 1) - (seq as usize % PARTITIONS_COUNT)
+    (seq as usize - 1) % PARTITIONS_COUNT
 }
 
 #[inline(always)]

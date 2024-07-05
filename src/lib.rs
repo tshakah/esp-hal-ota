@@ -8,10 +8,11 @@ pub mod paddr;
 
 // TODO: make macros for generating this from partitions.csv, delete them from lib
 // Maybe just add it as args to Ota object?
-pub const PARTITIONS_COUNT: usize = 2;
+pub const PARTITIONS_COUNT: usize = 3;
 pub const PARTITIONS: [core::ops::Range<u32>; PARTITIONS_COUNT] = [
     (0x10000..0x10000 + 0x100000),
     (0x110000..0x110000 + 0x100000),
+    (0x210000..0x210000 + 0x100000),
 ];
 
 pub const OTADATA_OFFSET: u32 = 0xd000;
