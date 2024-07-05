@@ -108,7 +108,7 @@ async fn main(spawner: Spawner) {
     log::info!("flash_size: {flash_size}");
     log::info!("target_crc: {target_crc}");
 
-    let mut ota = Ota::new(FlashStorage::new());
+    let mut ota = Ota::new(FlashStorage::new()).expect("Cannot create ota");
     ota.ota_begin(flash_size, target_crc);
 
     let mut bytes_read = 0;
@@ -137,7 +137,7 @@ async fn main(spawner: Spawner) {
 
     loop {
         log::info!("bump");
-        Timer::after_millis(1000).await;
+        Timer::after_millis(15000).await;
     }
 }
 

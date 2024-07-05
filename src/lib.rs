@@ -6,17 +6,9 @@ pub mod crc32;
 pub mod helpers;
 pub mod paddr;
 
-// TODO: make macros for generating this from partitions.csv, delete them from lib
-// Maybe just add it as args to Ota object?
-pub const PARTITIONS_COUNT: usize = 3;
-pub const PARTITIONS: [core::ops::Range<u32>; PARTITIONS_COUNT] = [
-    (0x10000..0x10000 + 0x100000),
-    (0x110000..0x110000 + 0x100000),
-    (0x210000..0x210000 + 0x100000),
-];
-
-pub const OTADATA_OFFSET: u32 = 0xd000;
-pub const OTADATA_SIZE: u32 = 0x2000;
+const PART_OFFSET: u32 = 0x8000;
+const PART_SIZE: u32 = 0xc00;
+const FIRST_OTA_PART_SUBTYPE: u8 = 0x10;
 
 #[derive(Clone)]
 pub struct FlashProgress {
@@ -29,6 +21,15 @@ pub struct FlashProgress {
     target_crc: u32,
 }
 
+#[derive(Debug)]
+pub struct PartitionInfo {
+    ota_partitions: [(u32, u32); 16],
+    ota_partitions_count: usize,
+
+    otadata_offset: u32,
+    otadata_size: u32,
+}
+
 // NOTE: I need to use generics, because after adding esp-storage dependency to
 // this project its not compiling LULE
 pub struct Ota<S>
@@ -36,7 +37,9 @@ where
     S: ReadStorage + Storage,
 {
     flash: S,
+
     progress: Option<FlashProgress>,
+    pinfo: PartitionInfo,
 }
 
 // TODO: add OtaError enum
@@ -45,17 +48,30 @@ impl<S> Ota<S>
 where
     S: ReadStorage + Storage,
 {
-    pub fn new(flash: S) -> Self {
-        Ota {
-            flash,
-            progress: None,
+    pub fn new(mut flash: S) -> Result<Self, ()> {
+        if let Some(pinfo) = Self::read_partitions(&mut flash) {
+            log::info!("parts: {:?}", &pinfo);
+
+            return Ok(Ota {
+                flash,
+                progress: None,
+                pinfo,
+            });
         }
+
+        Err(())
+    }
+
+    fn get_partitions(&self) -> &[(u32, u32)] {
+        &self.pinfo.ota_partitions[..self.pinfo.ota_partitions_count]
     }
 
     /// To begin ota update (need to provide flash size)
     pub fn ota_begin(&mut self, size: u32, target_crc: u32) {
-        let next_part = Self::get_next_ota_partition().expect("Add error handling here");
-        let ota_offset = PARTITIONS[next_part].start;
+        let next_part = self
+            .get_next_ota_partition()
+            .expect("Add error handling here");
+        let ota_offset = self.get_partitions()[next_part].0;
 
         self.progress = Some(FlashProgress {
             last_crc: 0,
@@ -109,8 +125,8 @@ where
     pub fn ota_flush(&mut self) -> Result<(), ()> {
         let progress = self.progress.clone().ok_or_else(|| ())?; // add error like OtaNotStarted
         if progress.target_crc != progress.last_crc {
-            log::info!("[OTA] Calculated crc: {:?}", progress.last_crc);
-            log::info!("[OTA] Target crc: {:?}", progress.target_crc);
+            log::warn!("[OTA] Calculated crc: {:?}", progress.last_crc);
+            log::warn!("[OTA] Target crc: {:?}", progress.target_crc);
             log::error!("[OTA] Crc check failed! Cant finish ota update...");
 
             return Err(()); // wrong crc err or sth like this
@@ -125,20 +141,25 @@ where
         let (seq1, seq2) = self.get_ota_boot_sequences();
 
         let mut target_seq = seq1.max(seq2);
-        while helpers::seq_to_part(target_seq) != target || target_seq == 0 {
+        while helpers::seq_to_part(target_seq, self.pinfo.ota_partitions_count) != target
+            || target_seq == 0
+        {
             target_seq += 1;
         }
 
         let flash = &mut self.flash;
         let target_crc = crc32::calc_crc32(&target_seq.to_le_bytes(), 0xFFFFFFFF);
         if seq1 > seq2 {
-            let offset = OTADATA_OFFSET + (OTADATA_SIZE >> 1);
+            let offset = self.pinfo.otadata_offset + (self.pinfo.otadata_size >> 1);
 
             _ = flash.write(offset, &target_seq.to_le_bytes());
             _ = flash.write(offset + 32 - 4, &target_crc.to_le_bytes());
         } else {
-            _ = flash.write(OTADATA_OFFSET, &target_seq.to_le_bytes());
-            _ = flash.write(OTADATA_OFFSET + 32 - 4, &target_crc.to_le_bytes());
+            _ = flash.write(self.pinfo.otadata_offset, &target_seq.to_le_bytes());
+            _ = flash.write(
+                self.pinfo.otadata_offset + 32 - 4,
+                &target_crc.to_le_bytes(),
+            );
         }
     }
 
@@ -148,13 +169,14 @@ where
     pub fn get_ota_boot_sequences(&mut self) -> (u32, u32) {
         let mut bytes = [0; 32];
 
-        _ = self.flash.read(OTADATA_OFFSET, &mut bytes);
+        _ = self.flash.read(self.pinfo.otadata_offset, &mut bytes);
         let crc1 = u32::from_le_bytes(bytes[(32 - 4)..32].try_into().unwrap());
         let seq1 = helpers::seq_or_default(&bytes[..4], crc1, 0);
 
-        _ = self
-            .flash
-            .read(OTADATA_OFFSET + (OTADATA_SIZE >> 1), &mut bytes);
+        _ = self.flash.read(
+            self.pinfo.otadata_offset + (self.pinfo.otadata_size >> 1),
+            &mut bytes,
+        );
         let crc2 = u32::from_le_bytes(bytes[(32 - 4)..32].try_into().unwrap());
         let seq2 = helpers::seq_or_default(&bytes[..4], crc2, 0);
 
@@ -162,8 +184,8 @@ where
     }
 
     /// Returns currently booted partition index
-    pub fn get_currently_booted_partition() -> Option<usize> {
-        paddr::esp_get_current_running_partition()
+    pub fn get_currently_booted_partition(&self) -> Option<usize> {
+        paddr::esp_get_current_running_partition(self.get_partitions())
     }
 
     /// BUG: this wont work if user has ota partitions not starting from ota0
@@ -172,8 +194,57 @@ where
     /// NOTE: This isn't reading from ota_boot_sequences, maybe in the future
     /// it will read from them to eliminate possibility of wrong PADDR result.
     /// (ESP-IDF has if's for PADDR-chain so it can fail somehow)
-    pub fn get_next_ota_partition() -> Option<usize> {
-        let curr_part = paddr::esp_get_current_running_partition();
-        curr_part.map(|next_part| (next_part + 1) % PARTITIONS_COUNT)
+    pub fn get_next_ota_partition(&self) -> Option<usize> {
+        let curr_part = paddr::esp_get_current_running_partition(self.get_partitions());
+        curr_part.map(|next_part| (next_part + 1) % self.pinfo.ota_partitions_count)
+    }
+
+    fn read_partitions(flash: &mut S) -> Option<PartitionInfo> {
+        let mut tmp_pinfo = PartitionInfo {
+            ota_partitions: [(0, 0); 16],
+            ota_partitions_count: 0,
+            otadata_size: 0,
+            otadata_offset: 0,
+        };
+
+        let mut bytes = [0xFF; 32];
+        let mut last_ota_part: i8 = -1;
+        for read_offset in (0..PART_SIZE).step_by(32) {
+            _ = flash.read(PART_OFFSET + read_offset, &mut bytes);
+            if &bytes == &[0xFF; 32] {
+                break;
+            }
+
+            let magic = &bytes[0..2];
+            if magic != &[0xAA, 0x50] {
+                continue;
+            }
+
+            let p_type = &bytes[2];
+            let p_subtype = &bytes[3];
+            let p_offset = u32::from_le_bytes(bytes[4..8].try_into().unwrap());
+            let p_size = u32::from_le_bytes(bytes[8..12].try_into().unwrap());
+            //let p_name = core::str::from_utf8(&bytes[12..28]).unwrap();
+            //let p_flags = u32::from_le_bytes(bytes[28..32].try_into().unwrap());
+            //log::info!("{magic:?} {p_type} {p_subtype} {p_offset} {p_size} {p_name} {p_flags}");
+
+            if *p_type == 0 && *p_subtype >= FIRST_OTA_PART_SUBTYPE {
+                let ota_part_idx = *p_subtype - FIRST_OTA_PART_SUBTYPE;
+                if ota_part_idx as i8 - last_ota_part != 1 {
+                    log::error!("Wrong ota partitions order!");
+                    return None;
+                }
+
+                last_ota_part = ota_part_idx as i8;
+                tmp_pinfo.ota_partitions[tmp_pinfo.ota_partitions_count] = (p_offset, p_size);
+                tmp_pinfo.ota_partitions_count += 1;
+            } else if *p_type == 1 && *p_subtype == 0 {
+                //otadata
+                tmp_pinfo.otadata_offset = p_offset;
+                tmp_pinfo.otadata_size = p_size;
+            }
+        }
+
+        Some(tmp_pinfo)
     }
 }

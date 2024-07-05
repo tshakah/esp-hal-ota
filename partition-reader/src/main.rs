@@ -3,6 +3,10 @@ const PARTITION_BYTES: &[u8] = include_bytes!("../part.bin");
 fn main() {
     let chunks = PARTITION_BYTES.chunks(32);
     for chunk in chunks {
+        if chunk == &[0xFF; 32] {
+            break;
+        }
+
         let magic = &chunk[0..2];
         if magic != &[0xAA, 0x50] {
             continue;
