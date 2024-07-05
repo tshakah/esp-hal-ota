@@ -25,7 +25,7 @@ where
 {
     flash: S,
 
-    last_crc: Option<u32>,
+    last_crc: u32,
     ota_offset: Option<u32>,
     target_partition: Option<usize>,
     flash_size: u32,
@@ -42,7 +42,7 @@ where
         Ota {
             flash,
 
-            last_crc: None,
+            last_crc: 0,
             ota_offset: None,
             target_partition: None,
             ota_remaining: 0,
@@ -98,11 +98,7 @@ where
             ota_offset
         );
 
-        self.last_crc = if let Some(last_crc) = self.last_crc {
-            Some(crc32::calc_crc32(&chunk[..write_size], last_crc))
-        } else {
-            Some(crc32::calc_crc32(&chunk[..write_size], 0xFFFFFFFF))
-        };
+        self.last_crc = crc32::calc_crc32(&chunk[..write_size], self.last_crc);
 
         *ota_offset += write_size as u32;
         self.ota_remaining -= write_size as u32;

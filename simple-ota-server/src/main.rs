@@ -5,11 +5,7 @@ use std::{
 
 fn main() {
     let binary = std::fs::read("./firmware.bin").unwrap();
-    let mut binary_bytes = Vec::with_capacity(binary.len() + 4);
-    binary_bytes.extend_from_slice(&[255, 255, 255, 255]); // to calc crc32 from binary, append
-                                                           // 4 x 255's at the beggining
-    binary_bytes.extend_from_slice(&binary);
-    let binary_crc = crc32fast::hash(&binary_bytes);
+    let binary_crc = crc32fast::hash(&binary);
 
     println!("BINARY_SIZE: {}", binary.len());
     println!("BINARY CRC32: {}", binary_crc);
