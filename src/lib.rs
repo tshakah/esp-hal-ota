@@ -24,6 +24,8 @@ where
     S: ReadStorage + Storage,
 {
     flash: S,
+
+    last_crc: Option<u32>,
     ota_offset: Option<u32>,
     target_partition: Option<usize>,
     flash_size: u32,
@@ -39,6 +41,8 @@ where
     pub fn new(flash: S) -> Self {
         Ota {
             flash,
+
+            last_crc: None,
             ota_offset: None,
             target_partition: None,
             ota_remaining: 0,
@@ -94,6 +98,12 @@ where
             ota_offset
         );
 
+        self.last_crc = if let Some(last_crc) = self.last_crc {
+            Some(crc32::calc_crc32(&chunk[..write_size], last_crc))
+        } else {
+            Some(crc32::calc_crc32(&chunk[..write_size], 0xFFFFFFFF))
+        };
+
         *ota_offset += write_size as u32;
         self.ota_remaining -= write_size as u32;
         Ok(self.ota_remaining == 0)
@@ -104,6 +114,8 @@ where
         if let Some(target_partition) = self.target_partition {
             self.set_target_ota_boot_partition(target_partition);
         }
+
+        log::info!("Calculated crc hash: {:?}", self.last_crc);
 
         Ok(())
     }

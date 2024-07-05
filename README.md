@@ -51,7 +51,7 @@ loop {
 - [ ] Partitions macro (to generate PARTITIONS const at compile time)
 - [ ] Other esp32's (like esp32c3, esp32s2, etc..)
 - [ ] Rollbacks
-- [ ] Simple example
+- [x] Simple example
 
 ## Resources
 - https://github.com/esp-rs/espflash (this led me to esp-idf-part)
