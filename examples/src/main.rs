@@ -98,10 +98,18 @@ async fn main(spawner: Spawner) {
         .await
         .expect("Cannot read firmware size!");
     let flash_size = u32::from_le_bytes(ota_buff[..4].try_into().unwrap());
-    log::info!("flash_size: {flash_size}");
 
-    let mut ota = Ota::new(FlashStorage::new()).with_next_partition_offset();
-    ota.set_flash_size(flash_size);
+    socket
+        .read(&mut ota_buff[..4])
+        .await
+        .expect("Cannot read target crc!");
+    let target_crc = u32::from_le_bytes(ota_buff[..4].try_into().unwrap());
+
+    log::info!("flash_size: {flash_size}");
+    log::info!("target_crc: {target_crc}");
+
+    let mut ota = Ota::new(FlashStorage::new());
+    ota.ota_begin(flash_size, target_crc);
 
     let mut bytes_read = 0;
     loop {

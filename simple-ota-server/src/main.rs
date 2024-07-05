@@ -15,8 +15,8 @@ fn main() {
         println!("Connection");
         let mut stream = stream.unwrap();
 
-        let buf = (binary.len() as u32).to_le_bytes();
-        _ = stream.write_all(&buf);
+        _ = stream.write_all(&(binary.len() as u32).to_le_bytes());
+        _ = stream.write_all(&binary_crc.to_le_bytes());
 
         let chunks = binary.chunks(4096 * 2);
         let mut buf = [0; 1];

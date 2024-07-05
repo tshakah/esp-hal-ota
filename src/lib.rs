@@ -17,6 +17,17 @@ pub const PARTITIONS: [core::ops::Range<u32>; PARTITIONS_COUNT] = [
 pub const OTADATA_OFFSET: u32 = 0xd000;
 pub const OTADATA_SIZE: u32 = 0x2000;
 
+#[derive(Clone)]
+pub struct FlashProgress {
+    last_crc: u32,
+    flash_offset: u32,
+    flash_size: u32,
+    remaining: u32,
+
+    target_partition: usize,
+    target_crc: u32,
+}
+
 // NOTE: I need to use generics, because after adding esp-storage dependency to
 // this project its not compiling LULE
 pub struct Ota<S>
@@ -24,12 +35,7 @@ where
     S: ReadStorage + Storage,
 {
     flash: S,
-
-    last_crc: u32,
-    ota_offset: Option<u32>,
-    target_partition: Option<usize>,
-    flash_size: u32,
-    ota_remaining: u32,
+    progress: Option<FlashProgress>,
 }
 
 // TODO: add OtaError enum
@@ -41,78 +47,75 @@ where
     pub fn new(flash: S) -> Self {
         Ota {
             flash,
+            progress: None,
+        }
+    }
 
+    /// To begin ota update (need to provide flash size)
+    pub fn ota_begin(&mut self, size: u32, target_crc: u32) {
+        let next_part = Self::get_next_ota_partition().expect("Add error handling here");
+        let ota_offset = PARTITIONS[next_part].start;
+
+        self.progress = Some(FlashProgress {
             last_crc: 0,
-            ota_offset: None,
-            target_partition: None,
-            ota_remaining: 0,
-            flash_size: 0,
-        }
-    }
-
-    /// Sets ota_offset as next partitions offset
-    pub fn with_next_partition_offset(self) -> Self {
-        let next_part = Self::get_next_ota_partition();
-        let ota_offset = next_part.map(|i| PARTITIONS[i].start);
-
-        Ota {
-            ota_offset,
+            flash_size: size,
+            remaining: size,
+            flash_offset: ota_offset,
             target_partition: next_part,
-            ..self
-        }
-    }
-
-    /// Sets the firmware flash size
-    pub fn set_flash_size(&mut self, size: u32) {
-        self.ota_remaining = size;
-        self.flash_size = size;
+            target_crc,
+        });
     }
 
     /// Returns ota progress in f32 (0..1)
     pub fn get_ota_progress(&self) -> f32 {
-        (self.flash_size - self.ota_remaining) as f32 / self.flash_size as f32
+        if self.progress.is_none() {
+            log::warn!("[OTA] Cannot get ota progress! Seems like update wasn't started yet.");
+            return 0.0;
+        }
+
+        let progress = self.progress.as_ref().expect("Add erorr handling here");
+        (progress.flash_size - progress.remaining) as f32 / progress.flash_size as f32
     }
 
     /// Writes next firmware chunk
     pub fn ota_write_chunk(&mut self, chunk: &[u8]) -> Result<bool, ()> {
-        if self.flash_size == 0 {
-            log::error!("[OTA] Cant write chunk without set_flash_size()");
-            return Err(());
-        }
-
-        if self.ota_remaining == 0 {
+        let progress = self.progress.as_mut().ok_or_else(|| ())?; // add error like OtaNotStarted
+        if progress.remaining == 0 {
             return Ok(true);
         }
 
-        let ota_offset = self.ota_offset.as_mut().ok_or_else(|| ())?;
         let write_size = chunk.len() as u32;
-        let write_size = write_size.min(self.ota_remaining) as usize;
+        let write_size = write_size.min(progress.remaining) as usize;
 
         self.flash
-            .write(*ota_offset, &chunk[..write_size])
+            .write(progress.flash_offset, &chunk[..write_size])
             .map_err(|_| ())?;
 
         log::debug!(
             "[OTA] Wrote {} bytes to ota partition at 0x{:x}",
             write_size,
-            ota_offset
+            progress.flash_offset
         );
 
-        self.last_crc = crc32::calc_crc32(&chunk[..write_size], self.last_crc);
+        progress.last_crc = crc32::calc_crc32(&chunk[..write_size], progress.last_crc);
 
-        *ota_offset += write_size as u32;
-        self.ota_remaining -= write_size as u32;
-        Ok(self.ota_remaining == 0)
+        progress.flash_offset += write_size as u32;
+        progress.remaining -= write_size as u32;
+        Ok(progress.remaining == 0)
     }
 
     // TODO: crc checks or sth
     pub fn ota_flush(&mut self) -> Result<(), ()> {
-        if let Some(target_partition) = self.target_partition {
-            self.set_target_ota_boot_partition(target_partition);
+        let progress = self.progress.clone().ok_or_else(|| ())?; // add error like OtaNotStarted
+        if progress.target_crc != progress.last_crc {
+            log::info!("[OTA] Calculated crc: {:?}", progress.last_crc);
+            log::info!("[OTA] Target crc: {:?}", progress.target_crc);
+            log::error!("[OTA] Crc check failed! Cant finish ota update...");
+
+            return Err(()); // wrong crc err or sth like this
         }
 
-        log::info!("Calculated crc hash: {:?}", self.last_crc);
-
+        self.set_target_ota_boot_partition(progress.target_partition);
         Ok(())
     }
 
