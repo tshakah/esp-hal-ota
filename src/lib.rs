@@ -11,6 +11,19 @@ const PART_SIZE: u32 = 0xc00;
 const FIRST_OTA_PART_SUBTYPE: u8 = 0x10;
 const OTA_VERIFY_READ_SIZE: usize = 256;
 
+#[derive(Debug, PartialEq)]
+pub enum OtaError {
+    NotEnoughPartitions,
+    OtaNotStarted,
+    FlashRWError,
+    WrongCRC,
+    WrongOTAPArtitionOrder,
+    OtaVerifyError,
+    NoNextOtaPartition,
+}
+
+type Result<T> = core::result::Result<T, OtaError>;
+
 #[derive(Clone)]
 pub struct FlashProgress {
     last_crc: u32,
@@ -43,27 +56,22 @@ where
     pinfo: PartitionInfo,
 }
 
-// TODO: add OtaError enum
-
 impl<S> Ota<S>
 where
     S: ReadStorage + Storage,
 {
-    pub fn new(mut flash: S) -> Result<Self, ()> {
-        if let Some(pinfo) = Self::read_partitions(&mut flash) {
-            if pinfo.ota_partitions_count < 2 {
-                log::error!("Not enough OTA partitions! (>= 2)");
-                return Err(()); // not enough partitions
-            }
-
-            return Ok(Ota {
-                flash,
-                progress: None,
-                pinfo,
-            });
+    pub fn new(mut flash: S) -> Result<Self> {
+        let pinfo = Self::read_partitions(&mut flash)?;
+        if pinfo.ota_partitions_count < 2 {
+            log::error!("Not enough OTA partitions! (>= 2)");
+            return Err(OtaError::NotEnoughPartitions);
         }
 
-        Err(())
+        Ok(Ota {
+            flash,
+            progress: None,
+            pinfo,
+        })
     }
 
     fn get_partitions(&self) -> &[(u32, u32)] {
@@ -71,12 +79,12 @@ where
     }
 
     /// To begin ota update (need to provide flash size)
-    pub fn ota_begin(&mut self, size: u32, target_crc: u32) {
+    pub fn ota_begin(&mut self, size: u32, target_crc: u32) -> Result<()> {
         let next_part = self
             .get_next_ota_partition()
-            .expect("Add error handling here");
-        let ota_offset = self.get_partitions()[next_part].0;
+            .ok_or(OtaError::NoNextOtaPartition)?;
 
+        let ota_offset = self.get_partitions()[next_part].0;
         self.progress = Some(FlashProgress {
             last_crc: 0,
             flash_size: size,
@@ -85,6 +93,8 @@ where
             target_partition: next_part,
             target_crc,
         });
+
+        Ok(())
     }
 
     /// Returns ota progress in f32 (0..1)
@@ -94,13 +104,17 @@ where
             return 0.0;
         }
 
-        let progress = self.progress.as_ref().expect("Add erorr handling here");
+        let progress = self.progress.as_ref().unwrap();
         (progress.flash_size - progress.remaining) as f32 / progress.flash_size as f32
     }
 
     /// Writes next firmware chunk
-    pub fn ota_write_chunk(&mut self, chunk: &[u8]) -> Result<bool, ()> {
-        let progress = self.progress.as_mut().ok_or_else(|| ())?; // add error like OtaNotStarted
+    pub fn ota_write_chunk(&mut self, chunk: &[u8]) -> Result<bool> {
+        let progress = self
+            .progress
+            .as_mut()
+            .ok_or_else(|| OtaError::OtaNotStarted)?;
+
         if progress.remaining == 0 {
             return Ok(true);
         }
@@ -110,7 +124,7 @@ where
 
         self.flash
             .write(progress.flash_offset, &chunk[..write_size])
-            .map_err(|_| ())?;
+            .map_err(|_| OtaError::FlashRWError)?;
 
         log::debug!(
             "[OTA] Wrote {} bytes to ota partition at 0x{:x}",
@@ -126,21 +140,25 @@ where
     }
 
     /// verify - should it read flash and check crc
-    pub fn ota_flush(&mut self, verify: bool) -> Result<(), ()> {
+    pub fn ota_flush(&mut self, verify: bool) -> Result<()> {
         if verify {
             if !self.ota_verify()? {
                 log::error!("[OTA] Verify failed! Not flushing...");
-                return Err(()); // verify error
+                return Err(OtaError::OtaVerifyError);
             }
         }
 
-        let progress = self.progress.clone().ok_or_else(|| ())?; // add error like OtaNotStarted
+        let progress = self
+            .progress
+            .clone()
+            .ok_or_else(|| OtaError::OtaNotStarted)?;
+
         if progress.target_crc != progress.last_crc {
             log::warn!("[OTA] Calculated crc: {:?}", progress.last_crc);
             log::warn!("[OTA] Target crc: {:?}", progress.target_crc);
             log::error!("[OTA] Crc check failed! Cant finish ota update...");
 
-            return Err(()); // wrong crc err or sth like this
+            return Err(OtaError::WrongCRC);
         }
 
         self.set_target_ota_boot_partition(progress.target_partition);
@@ -148,8 +166,12 @@ where
     }
 
     /// It reads written flash and checks crc
-    pub fn ota_verify(&mut self) -> Result<bool, ()> {
-        let progress = self.progress.clone().ok_or_else(|| ())?; // add error like OtaNotStarted
+    pub fn ota_verify(&mut self) -> Result<bool> {
+        let progress = self
+            .progress
+            .clone()
+            .ok_or_else(|| OtaError::OtaNotStarted)?;
+
         let mut calc_crc = 0;
         let mut bytes = [0; OTA_VERIFY_READ_SIZE];
 
@@ -235,7 +257,7 @@ where
         curr_part.map(|next_part| (next_part + 1) % self.pinfo.ota_partitions_count)
     }
 
-    fn read_partitions(flash: &mut S) -> Option<PartitionInfo> {
+    fn read_partitions(flash: &mut S) -> Result<PartitionInfo> {
         let mut tmp_pinfo = PartitionInfo {
             ota_partitions: [(0, 0); 16],
             ota_partitions_count: 0,
@@ -267,8 +289,7 @@ where
             if *p_type == 0 && *p_subtype >= FIRST_OTA_PART_SUBTYPE {
                 let ota_part_idx = *p_subtype - FIRST_OTA_PART_SUBTYPE;
                 if ota_part_idx as i8 - last_ota_part != 1 {
-                    log::error!("Wrong ota partitions order!");
-                    return None;
+                    return Err(OtaError::WrongOTAPArtitionOrder);
                 }
 
                 last_ota_part = ota_part_idx as i8;
@@ -281,6 +302,6 @@ where
             }
         }
 
-        Some(tmp_pinfo)
+        Ok(tmp_pinfo)
     }
 }

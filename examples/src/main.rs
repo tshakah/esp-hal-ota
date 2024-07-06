@@ -109,7 +109,7 @@ async fn main(spawner: Spawner) {
     log::info!("target_crc: {target_crc}");
 
     let mut ota = Ota::new(FlashStorage::new()).expect("Cannot create ota");
-    ota.ota_begin(flash_size, target_crc);
+    ota.ota_begin(flash_size, target_crc).unwrap();
 
     let mut bytes_read = 0;
     loop {
@@ -125,17 +125,24 @@ async fn main(spawner: Spawner) {
                 _ = socket.write(&[0]).await;
             }
 
-            if res == Ok(true) {
-                let res = ota.ota_flush(false);
-                if let Err(e) = res {
-                    log::error!("Ota flush error: {e:?}");
+            match res {
+                Ok(true) => {
+                    let res = ota.ota_flush(false);
+                    if let Err(e) = res {
+                        log::error!("Ota flush error: {e:?}");
+                        break;
+                    }
+
+                    log::info!("Ota OK! Rebooting in 1s!");
+                    Timer::after_millis(1000).await;
+                    esp_hal::reset::software_reset();
                     break;
                 }
-
-                log::info!("Ota OK! Rebooting in 1s!");
-                Timer::after_millis(1000).await;
-                esp_hal::reset::software_reset();
-                break;
+                Err(e) => {
+                    log::error!("Ota write error: {e:?}");
+                    break;
+                }
+                _ => {}
             }
         }
 
