@@ -8,8 +8,11 @@ use embassy_net::{tcp::TcpSocket, Config, Stack, StackResources};
 use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl, peripherals::Peripherals, prelude::*, system::SystemControl,
-    timer::timg::TimerGroup,
+    clock::ClockControl,
+    peripherals::Peripherals,
+    prelude::*,
+    system::SystemControl,
+    timer::{timg::TimerGroup, ErasedTimer, OneShotTimer, PeriodicTimer},
 };
 use esp_hal_ota::Ota;
 use esp_storage::FlashStorage;
@@ -39,19 +42,27 @@ async fn main(spawner: Spawner) {
     esp_println::logger::init_logger_from_env();
     log::set_max_level(log::LevelFilter::Info);
 
+    let timer = PeriodicTimer::new(
+        esp_hal::timer::timg::TimerGroup::new(peripherals.TIMG1, &clocks, None)
+            .timer0
+            .into(),
+    );
+
     let rng = esp_hal::rng::Rng::new(peripherals.RNG);
-    let timer = esp_hal::timer::timg::TimerGroup::new(peripherals.TIMG1, &clocks, None);
     let init = esp_wifi::initialize(
         esp_wifi::EspWifiInitFor::Wifi,
-        timer.timer0,
+        timer,
         rng.clone(),
         peripherals.RADIO_CLK,
         &clocks,
     )
     .unwrap();
 
-    let timg0 = TimerGroup::new_async(peripherals.TIMG0, &clocks);
-    esp_hal_embassy::init(&clocks, timg0);
+    let timg1 = TimerGroup::new(peripherals.TIMG0, &clocks, None);
+    let timer0 = OneShotTimer::new(timg1.timer0.into());
+    let timers = [timer0];
+    let timers: &mut [OneShotTimer<ErasedTimer>; 1] = make_static!(timers);
+    esp_hal_embassy::init(&clocks, timers);
 
     let wifi = peripherals.WIFI;
     let (wifi_interface, controller) =
