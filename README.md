@@ -1,6 +1,9 @@
 # esp-hal-ota
 OTA for esp-hal (no-std).
 
+[![crates.io](https://img.shields.io/crates/v/mdns.svg)](https://crates.io/crates/esp-hal-ota)
+[![MIT license](https://img.shields.io/github/license/mashape/apistatus.svg)]()
+
 ## Limitations
 For now only works on esp32s3 (esp32c3 in the near future).
 
@@ -42,7 +45,7 @@ loop {
 ## Todo
 - [x] Fully working library
 - [x] Simple example
-- [ ] Better errors
+- [x] Better errors
 - [ ] Other esp32's (like esp32c3, esp32s2, etc..)
 - [ ] Rollbacks
 
