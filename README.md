@@ -1,7 +1,7 @@
 # esp-hal-ota
 OTA for esp-hal (no-std).
 
-[![crates.io](https://img.shields.io/crates/v/mdns.svg)](https://crates.io/crates/esp-hal-ota)
+[![crates.io](https://img.shields.io/crates/v/esp-hal-ota.svg)](https://crates.io/crates/esp-hal-ota)
 [![MIT license](https://img.shields.io/github/license/mashape/apistatus.svg)]()
 
 ## Limitations
@@ -12,6 +12,16 @@ For now only works on esp32s3 (esp32c3 in the near future).
 - Dynamic partitions reading (so no macros, no reading from partitions.csv) - fully automatic
 - Checking currently booted partition (using some pointer magic from ESP-IDF)
 - CRC32 verification
+
+## Getting started
+- Create `partitions.csv` file in project root (copy `partitions.csv.template` file)
+- In your project edit `./.cargo/config.toml` file and append `-T ./partitions.csv` to the `runner` attribute
+- Optionally append `--erase-parts otadata` to `./cargo/config.toml` to fix some ota issues
+
+```toml
+[target.xtensa-esp32s3-none-elf]
+runner = "espflash flash --monitor -T ./partitions.csv --erase-parts otadata"
+```
 
 ## Example
 To see real-world example look at `./examples` and `./simple-ota-server` dirs.

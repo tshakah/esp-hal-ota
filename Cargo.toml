@@ -1,6 +1,6 @@
 [package]
 name = "esp-hal-ota"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 license = "MIT"
 description = "OTA library for esp-hal"
@@ -9,4 +9,8 @@ description = "OTA library for esp-hal"
 
 [dependencies]
 embedded-storage = "0.3.1"
-log = "0.4.22"
+log = { version = "0.4.22", optional = true }
+
+[features]
+default = ["log"]
+log = ["dep:log"]

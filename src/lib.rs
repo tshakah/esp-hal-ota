@@ -63,7 +63,9 @@ where
     pub fn new(mut flash: S) -> Result<Self> {
         let pinfo = Self::read_partitions(&mut flash)?;
         if pinfo.ota_partitions_count < 2 {
+            #[cfg(feature = "log")]
             log::error!("Not enough OTA partitions! (>= 2)");
+
             return Err(OtaError::NotEnoughPartitions);
         }
 
@@ -100,7 +102,9 @@ where
     /// Returns ota progress in f32 (0..1)
     pub fn get_ota_progress(&self) -> f32 {
         if self.progress.is_none() {
+            #[cfg(feature = "log")]
             log::warn!("[OTA] Cannot get ota progress! Seems like update wasn't started yet.");
+
             return 0.0;
         }
 
@@ -126,6 +130,7 @@ where
             .write(progress.flash_offset, &chunk[..write_size])
             .map_err(|_| OtaError::FlashRWError)?;
 
+        #[cfg(feature = "log")]
         log::debug!(
             "[OTA] Wrote {} bytes to ota partition at 0x{:x}",
             write_size,
@@ -143,7 +148,9 @@ where
     pub fn ota_flush(&mut self, verify: bool) -> Result<()> {
         if verify {
             if !self.ota_verify()? {
+                #[cfg(feature = "log")]
                 log::error!("[OTA] Verify failed! Not flushing...");
+
                 return Err(OtaError::OtaVerifyError);
             }
         }
@@ -154,9 +161,12 @@ where
             .ok_or_else(|| OtaError::OtaNotStarted)?;
 
         if progress.target_crc != progress.last_crc {
-            log::warn!("[OTA] Calculated crc: {:?}", progress.last_crc);
-            log::warn!("[OTA] Target crc: {:?}", progress.target_crc);
-            log::error!("[OTA] Crc check failed! Cant finish ota update...");
+            #[cfg(feature = "log")]
+            {
+                log::warn!("[OTA] Calculated crc: {:?}", progress.last_crc);
+                log::warn!("[OTA] Target crc: {:?}", progress.target_crc);
+                log::error!("[OTA] Crc check failed! Cant finish ota update...");
+            }
 
             return Err(OtaError::WrongCRC);
         }
