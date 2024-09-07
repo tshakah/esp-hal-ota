@@ -12,7 +12,7 @@ embedded-storage = "0.3.1"
 log = { version = "0.4.22", optional = true }
 
 [features]
-default = ["log"]
+default = ["log", "esp32s3"]
 log = ["dep:log"]
 
 esp32c3 = []
