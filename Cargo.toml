@@ -14,3 +14,11 @@ log = { version = "0.4.22", optional = true }
 [features]
 default = ["log"]
 log = ["dep:log"]
+
+#esp32 = []
+#esp32c2 = []
+esp32c3 = []
+#esp32c6 = []
+#esp32h2 = []
+esp32s2 = []
+esp32s3 = []
