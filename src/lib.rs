@@ -7,48 +7,17 @@
 compile_error!("You need to select at least one target: \"esp32c3\", \"esp32s2\", \"esp32s3\".");
 
 use embedded_storage::{ReadStorage, Storage};
+pub use structs::*;
 
 pub mod crc32;
 pub mod helpers;
 pub mod paddr;
+pub mod structs;
 
 const PART_OFFSET: u32 = 0x8000;
 const PART_SIZE: u32 = 0xc00;
 const FIRST_OTA_PART_SUBTYPE: u8 = 0x10;
 const OTA_VERIFY_READ_SIZE: usize = 256;
-
-#[derive(Debug, PartialEq)]
-pub enum OtaError {
-    NotEnoughPartitions,
-    OtaNotStarted,
-    FlashRWError,
-    WrongCRC,
-    WrongOTAPArtitionOrder,
-    OtaVerifyError,
-    NoNextOtaPartition,
-}
-
-type Result<T> = core::result::Result<T, OtaError>;
-
-#[derive(Clone)]
-pub struct FlashProgress {
-    last_crc: u32,
-    flash_offset: u32,
-    flash_size: u32,
-    remaining: u32,
-
-    target_partition: usize,
-    target_crc: u32,
-}
-
-#[derive(Debug)]
-pub struct PartitionInfo {
-    ota_partitions: [(u32, u32); 16],
-    ota_partitions_count: usize,
-
-    otadata_offset: u32,
-    otadata_size: u32,
-}
 
 // NOTE: I need to use generics, because after adding esp-storage dependency to
 // this project its not compiling LULE
@@ -212,7 +181,8 @@ where
 
     /// Sets ota boot target partition
     pub fn set_target_ota_boot_partition(&mut self, target: usize) {
-        let (seq1, seq2) = self.get_ota_boot_sequences();
+        let (slot1, slot2) = self.get_ota_boot_entries();
+        let (seq1, seq2) = (slot1.seq, slot2.seq);
 
         let mut target_seq = seq1.max(seq2);
         while helpers::seq_to_part(target_seq, self.pinfo.ota_partitions_count) != target
@@ -240,21 +210,25 @@ where
     /// Returns current OTA boot sequences
     ///
     /// NOTE: if crc doesn't match, it returns 0 for that seq
-    pub fn get_ota_boot_sequences(&mut self) -> (u32, u32) {
+    /// NOTE: [Entry struct (link to .h file)](https://github.com/espressif/esp-idf/blob/master/components/bootloader_support/include/esp_flash_partitions.h#L66)
+    pub fn get_ota_boot_entries(&mut self) -> (EspOtaSelectEntry, EspOtaSelectEntry) {
         let mut bytes = [0; 32];
-
         _ = self.flash.read(self.pinfo.otadata_offset, &mut bytes);
-        let crc1 = u32::from_le_bytes(bytes[(32 - 4)..32].try_into().unwrap());
-        let seq1 = helpers::seq_or_default(&bytes[..4], crc1, 0);
+        let mut slot1: EspOtaSelectEntry =
+            unsafe { core::ptr::read(bytes.as_ptr() as *const EspOtaSelectEntry) };
+        slot1.check_crc();
+        log::info!("read slot1: {slot1:?}");
 
         _ = self.flash.read(
             self.pinfo.otadata_offset + (self.pinfo.otadata_size >> 1),
             &mut bytes,
         );
-        let crc2 = u32::from_le_bytes(bytes[(32 - 4)..32].try_into().unwrap());
-        let seq2 = helpers::seq_or_default(&bytes[..4], crc2, 0);
+        let mut slot2: EspOtaSelectEntry =
+            unsafe { core::ptr::read(bytes.as_ptr() as *const EspOtaSelectEntry) };
+        slot2.check_crc();
+        log::info!("read slot2: {slot2:?}");
 
-        (seq1, seq2)
+        (slot1, slot2)
     }
 
     /// Returns currently booted partition index

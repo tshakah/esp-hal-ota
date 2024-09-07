@@ -16,3 +16,18 @@ pub fn seq_or_default(seq: &[u8], crc: u32, default: u32) -> u32 {
 
     default
 }
+
+#[inline(always)]
+/// Helper function!
+/// Check if crc is correct for given seq
+pub fn is_crc_seq_correct(seq: u32, crc: u32) -> bool {
+    let bytes = unsafe {
+        let mut buf = [0; 4]; //u32
+        core::ptr::copy_nonoverlapping(&seq as *const u32 as *const u8, buf.as_mut_ptr(), 4);
+
+        buf
+    };
+
+    let crc_calc = crate::crc32::calc_crc32(&bytes, 0xFFFFFFFF);
+    crc == crc_calc
+}
