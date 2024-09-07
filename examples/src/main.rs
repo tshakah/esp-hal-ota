@@ -8,10 +8,7 @@ use embassy_net::{tcp::TcpSocket, Config, Stack, StackResources};
 use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::{
-    clock::ClockControl,
-    peripherals::Peripherals,
-    prelude::*,
-    system::SystemControl,
+    clock::ClockControl, peripherals::Peripherals, prelude::*, system::SystemControl,
     timer::timg::TimerGroup,
 };
 use esp_hal_ota::Ota;
