@@ -5,7 +5,7 @@ OTA for esp-hal (no-std).
 [![MIT license](https://img.shields.io/github/license/mashape/apistatus.svg)]()
 
 ## Limitations
-For now only works on esp32s3 (esp32c3 in the near future).
+For now only works on esp32c3,esp32s3 (and possibly on esp32s2 - no way of testing it).
 
 ## Features
 - Obviously OTA updates
@@ -56,7 +56,7 @@ loop {
 - [x] Fully working library
 - [x] Simple example
 - [x] Better errors
-- [ ] Other esp32's (like esp32c3, esp32s2, etc..)
+- [x] Other esp32's (like esp32c3, esp32s2, etc..)
 - [ ] Rollbacks
 
 ## Resources
