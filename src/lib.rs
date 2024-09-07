@@ -1,4 +1,10 @@
 #![no_std]
+#[cfg(all(
+    not(feature = "esp32c3"),
+    not(feature = "esp32s2"),
+    not(feature = "esp32s3")
+))]
+compile_error!("You need to select at least one target: \"esp32c3\", \"esp32s2\", \"esp32s3\".");
 
 use embedded_storage::{ReadStorage, Storage};
 
