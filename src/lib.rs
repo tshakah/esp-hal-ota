@@ -1,10 +1,4 @@
 #![no_std]
-#[cfg(all(
-    not(feature = "esp32c3"),
-    not(feature = "esp32s2"),
-    not(feature = "esp32s3")
-))]
-compile_error!("You need to select at least one target: \"esp32c3\", \"esp32s2\", \"esp32s3\".");
 
 use embedded_storage::{ReadStorage, Storage};
 pub use structs::*;
@@ -217,7 +211,6 @@ where
         let mut slot1: EspOtaSelectEntry =
             unsafe { core::ptr::read(bytes.as_ptr() as *const EspOtaSelectEntry) };
         slot1.check_crc();
-        log::info!("read slot1: {slot1:?}");
 
         _ = self.flash.read(
             self.pinfo.otadata_offset + (self.pinfo.otadata_size >> 1),
@@ -226,7 +219,6 @@ where
         let mut slot2: EspOtaSelectEntry =
             unsafe { core::ptr::read(bytes.as_ptr() as *const EspOtaSelectEntry) };
         slot2.check_crc();
-        log::info!("read slot2: {slot2:?}");
 
         (slot1, slot2)
     }
