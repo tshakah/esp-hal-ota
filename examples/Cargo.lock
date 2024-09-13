@@ -606,6 +606,7 @@ dependencies = [
  "esp-metadata",
  "esp-riscv-rt",
  "esp-synopsys-usb-otg",
+ "esp32c3",
  "esp32s3",
  "fugit",
  "log",
@@ -613,6 +614,7 @@ dependencies = [
  "paste",
  "portable-atomic",
  "rand_core",
+ "riscv",
  "serde",
  "strum",
  "usb-device",
@@ -787,6 +789,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1829bd8c63b22a6d8a5485203a6e6bdc008897d9ee687aa6df8b57d2103a48d2"
 dependencies = [
  "anyhow",
+]
+
+[[package]]
+name = "esp32c3"
+version = "0.25.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3922cd13da83d070892c47e66f005856c62510952198c3008bc4f3b79f3e9623"
+dependencies = [
+ "critical-section",
+ "vcell",
 ]
 
 [[package]]
@@ -1269,11 +1281,10 @@ checksum = "955d28af4278de8121b7ebeb796b6a45735dc01436d898801014aced2773a3d6"
 
 [[package]]
 name = "ruzstd"
-version = "0.7.1"
+version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1c8b8f3d26bd9f945e5cbae77f7cdfbf37af9a66956f1115eb4516e45df519f4"
+checksum = "99c3938e133aac070997ddc684d4b393777d293ba170f2988c8fd5ea2ad4ce21"
 dependencies = [
- "byteorder",
  "twox-hash",
 ]
 

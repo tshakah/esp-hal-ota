@@ -6,19 +6,19 @@ edition = "2021"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
-esp-backtrace = { version = "0.14.1", features = [ "esp32s3", "exception-handler", "panic-handler", "println" ] }
-esp-hal = { version = "0.20.1", features = [ "esp32s3", "embedded-hal", "embedded-hal-02", "async" ] }
-esp-println = { version = "0.11.0", features = ["esp32s3", "log"] }
+esp-backtrace = { version = "0.14.1", features = [ "exception-handler", "panic-handler", "println" ] }
+esp-hal = { version = "0.20.1", features = [ "embedded-hal", "embedded-hal-02", "async" ] }
+esp-println = { version = "0.11.0", features = ["log"] }
 log = { version = "0.4.22" }
-esp-wifi = { version = "0.8.0", features = [ "esp32s3", "phy-enable-usb", "utils", "wifi", "dhcpv4", "ble", "embassy-net" ] }
-esp-hal-embassy = { version = "0.3.0", features = ["integrated-timers", "esp32s3"] }
+esp-wifi = { version = "0.8.0", features = [ "phy-enable-usb", "utils", "wifi", "dhcpv4", "ble", "embassy-net" ] }
+esp-hal-embassy = { version = "0.3.0", features = ["integrated-timers"] }
 embassy-executor = { version = "0.6.0", package = "embassy-executor", features = ["arch-riscv32", "task-arena-size-10240"] }
 embassy-net = { version = "0.4.0", features = ["tcp", "udp", "dhcpv4", "medium-ethernet"] }
 embassy-time = { version = "0.3.2" }
-esp-storage = { version = "0.3.0", features = ["esp32s3"] }
-esp-hal-ota = { path = "../", features = ["esp32s3"] }
+esp-storage = { version = "0.3.0", features = [] }
+esp-hal-ota = { path = "../", features = [] }
 static_cell = { version = "2.1.0", features = ["nightly"] }
-xtensa-lx-rt = { version = "0.17.1", features = ["esp32s3", "float-save-restore"] }
+xtensa-lx-rt = { version = "0.17.1", optional = true, features = ["esp32s3", "float-save-restore"] }
 
 [build-dependencies]
 dotenvy = "0.15.7"
@@ -36,3 +36,8 @@ incremental = false
 lto = 'fat'
 opt-level = 's'
 overflow-checks = false
+
+[features]
+default = ["esp32s3"]
+esp32s3 = ["esp-backtrace/esp32s3", "esp-hal/esp32s3", "esp-println/esp32s3", "esp-wifi/esp32s3", "esp-hal-embassy/esp32s3", "esp-storage/esp32s3", "esp-hal-ota/esp32s3", "dep:xtensa-lx-rt"]
+esp32c3 = ["esp-backtrace/esp32c3", "esp-hal/esp32c3", "esp-println/esp32c3", "esp-wifi/esp32c3", "esp-hal-embassy/esp32c3", "esp-storage/esp32c3", "esp-hal-ota/esp32c3"]

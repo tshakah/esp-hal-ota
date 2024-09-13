@@ -37,7 +37,7 @@ async fn main(spawner: Spawner) {
     //let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
     esp_println::logger::init_logger_from_env();
-    log::set_max_level(log::LevelFilter::Info);
+    //log::set_max_level(log::LevelFilter::Info); // only for esp32s3??
 
     let rng = esp_hal::rng::Rng::new(peripherals.RNG);
     let timg1 = TimerGroup::new(peripherals.TIMG1, &clocks);
