@@ -52,6 +52,14 @@ loop {
 }
 ```
 
+### Running example
+- You can compile your .bin file using esp-flash 
+```bash
+espflash save-image --chip esp32c3 ./target/riscv32imc-unknown-none-elf/debug/esp-hal-ota-example ../simple-ota-server/firmware.bin
+```
+
+This will generate .bin file from build file for chip.
+
 ## Todo
 - [x] Fully working library
 - [x] Simple example

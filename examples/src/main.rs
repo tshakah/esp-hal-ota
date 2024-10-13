@@ -2,15 +2,13 @@
 #![no_main]
 #![feature(type_alias_impl_trait)]
 
+extern crate alloc;
 use core::str::FromStr;
 use embassy_executor::Spawner;
 use embassy_net::{tcp::TcpSocket, Config, Stack, StackResources};
 use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
-use esp_hal::{
-    clock::ClockControl, peripherals::Peripherals, prelude::*, system::SystemControl,
-    timer::timg::TimerGroup,
-};
+use esp_hal::{prelude::*, timer::timg::TimerGroup};
 use esp_hal_ota::Ota;
 use esp_storage::FlashStorage;
 use esp_wifi::wifi::{
@@ -30,28 +28,26 @@ static mut RX_BUFF: [u8; RX_BUFFER_SIZE] = [0; RX_BUFFER_SIZE];
 
 #[main]
 async fn main(spawner: Spawner) {
-    let peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::max(system.clock_control).freeze();
-    let clocks = &*make_static!(clocks);
+    esp_alloc::heap_allocator!(150 * 1024);
+
+    let peripherals = esp_hal::init(esp_hal::Config::default());
     //let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
     esp_println::logger::init_logger_from_env();
     //log::set_max_level(log::LevelFilter::Info); // only for esp32s3??
 
     let rng = esp_hal::rng::Rng::new(peripherals.RNG);
-    let timg1 = TimerGroup::new(peripherals.TIMG1, &clocks);
-    let init = esp_wifi::initialize(
+    let timg1 = TimerGroup::new(peripherals.TIMG1);
+    let init = esp_wifi::init(
         esp_wifi::EspWifiInitFor::Wifi,
         timg1.timer0,
         rng.clone(),
         peripherals.RADIO_CLK,
-        &clocks,
     )
     .unwrap();
 
-    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
-    esp_hal_embassy::init(&clocks, timg0.timer0);
+    let timg0 = TimerGroup::new(peripherals.TIMG0);
+    esp_hal_embassy::init(timg0.timer0);
 
     let wifi = peripherals.WIFI;
     let (wifi_interface, controller) =
