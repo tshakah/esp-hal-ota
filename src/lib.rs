@@ -5,7 +5,8 @@ pub use structs::*;
 
 pub mod crc32;
 pub mod helpers;
-pub mod paddr;
+pub mod mmu_hal;
+pub mod mmu_ll;
 pub mod structs;
 
 const PART_OFFSET: u32 = 0x8000;
@@ -225,7 +226,7 @@ where
 
     /// Returns currently booted partition index
     pub fn get_currently_booted_partition(&self) -> Option<usize> {
-        paddr::esp_get_current_running_partition(self.get_partitions())
+        mmu_hal::esp_get_current_running_partition(self.get_partitions())
     }
 
     /// BUG: this wont work if user has ota partitions not starting from ota0
@@ -235,7 +236,7 @@ where
     /// it will read from them to eliminate possibility of wrong PADDR result.
     /// (ESP-IDF has if's for PADDR-chain so it can fail somehow)
     pub fn get_next_ota_partition(&self) -> Option<usize> {
-        let curr_part = paddr::esp_get_current_running_partition(self.get_partitions());
+        let curr_part = mmu_hal::esp_get_current_running_partition(self.get_partitions());
         curr_part.map(|next_part| (next_part + 1) % self.pinfo.ota_partitions_count)
     }
 
