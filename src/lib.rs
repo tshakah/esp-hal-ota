@@ -1,5 +1,5 @@
 #![no_std]
-#![feature(concat_idents)]
+#![cfg_attr(any(feature = "esp32", feature = "esp32s2"), feature(concat_idents))]
 #![cfg_attr(feature = "esp32", feature(asm_experimental_arch))]
 #![doc = include_str!("../README.md")]
 

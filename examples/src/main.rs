@@ -39,7 +39,33 @@ macro_rules! mk_static {
 
 #[main]
 async fn main(spawner: Spawner) {
-    esp_alloc::heap_allocator!(150 * 1024);
+    #[cfg(not(feature = "esp32"))]
+    {
+        esp_alloc::heap_allocator!(150 * 1024);
+    }
+
+    #[cfg(feature = "esp32")]
+    {
+        static mut HEAP: core::mem::MaybeUninit<[u8; 30 * 1024]> = core::mem::MaybeUninit::uninit();
+
+        #[link_section = ".dram2_uninit"]
+        static mut HEAP2: core::mem::MaybeUninit<[u8; 64 * 1024]> =
+            core::mem::MaybeUninit::uninit();
+
+        unsafe {
+            esp_alloc::HEAP.add_region(esp_alloc::HeapRegion::new(
+                HEAP.as_mut_ptr() as *mut u8,
+                core::mem::size_of_val(&*core::ptr::addr_of!(HEAP)),
+                esp_alloc::MemoryCapability::Internal.into(),
+            ));
+
+            esp_alloc::HEAP.add_region(esp_alloc::HeapRegion::new(
+                HEAP2.as_mut_ptr() as *mut u8,
+                core::mem::size_of_val(&*core::ptr::addr_of!(HEAP2)),
+                esp_alloc::MemoryCapability::Internal.into(),
+            ));
+        }
+    }
 
     let peripherals = esp_hal::init(esp_hal::Config::default());
     //let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);

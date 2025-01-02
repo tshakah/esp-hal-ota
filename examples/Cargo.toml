@@ -35,10 +35,11 @@ debug = 2
 debug-assertions = false
 incremental = false
 lto = 'fat'
-opt-level = 's'
+opt-level = 2
 overflow-checks = false
 
 [features]
 default = ["esp32s3"]
 esp32s3 = ["esp-backtrace/esp32s3", "esp-hal/esp32s3", "esp-println/esp32s3", "esp-wifi/esp32s3", "esp-hal-embassy/esp32s3", "esp-storage/esp32s3", "esp-hal-ota/esp32s3"]
 esp32c3 = ["esp-backtrace/esp32c3", "esp-hal/esp32c3", "esp-println/esp32c3", "esp-wifi/esp32c3", "esp-hal-embassy/esp32c3", "esp-storage/esp32c3", "esp-hal-ota/esp32c3"]
+esp32 = ["esp-backtrace/esp32", "esp-hal/esp32", "esp-println/esp32", "esp-wifi/esp32", "esp-hal-embassy/esp32", "esp-storage/esp32", "esp-hal-ota/esp32"]
