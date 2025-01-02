@@ -1,4 +1,6 @@
 #![no_std]
+#![feature(concat_idents)]
+#![doc = include_str!("../README.md")]
 
 use embedded_storage::{ReadStorage, Storage};
 pub use structs::*;
