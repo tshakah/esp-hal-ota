@@ -1,5 +1,6 @@
 #![no_std]
 #![feature(concat_idents)]
+#![cfg_attr(feature = "esp32", feature(asm_experimental_arch))]
 #![doc = include_str!("../README.md")]
 
 use embedded_storage::{ReadStorage, Storage};

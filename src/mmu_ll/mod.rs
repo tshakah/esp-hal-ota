@@ -1,3 +1,15 @@
+macro_rules! soc_address_in_bus {
+    ($bus_name:ident, $vaddr:ident) => {{
+        $vaddr >= concat_idents!($bus_name, _ADDRESS_LOW)
+            && $vaddr < concat_idents!($bus_name, _ADDRESS_HIGH)
+    }};
+}
+
+#[cfg(feature = "esp32")]
+mod esp32;
+#[cfg(feature = "esp32")]
+pub use esp32::*;
+
 #[cfg(feature = "esp32s2")]
 mod esp32s2;
 #[cfg(feature = "esp32s2")]
