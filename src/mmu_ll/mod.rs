@@ -40,3 +40,25 @@ pub use esp32c6::*;
 mod esp32h2;
 #[cfg(feature = "esp32h2")]
 pub use esp32h2::*;
+
+#[cfg(not(any(
+    feature = "esp32",
+    feature = "esp32s2",
+    feature = "esp32s3",
+    feature = "esp32c2",
+    feature = "esp32c3",
+    feature = "esp32c6",
+    feature = "esp32h2"
+)))]
+mod not_selected;
+
+#[cfg(not(any(
+    feature = "esp32",
+    feature = "esp32s2",
+    feature = "esp32s3",
+    feature = "esp32c2",
+    feature = "esp32c3",
+    feature = "esp32c6",
+    feature = "esp32h2"
+)))]
+pub use not_selected::*;
