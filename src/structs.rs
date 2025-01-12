@@ -9,6 +9,7 @@ pub enum OtaError {
     WrongOTAPArtitionOrder,
     OtaVerifyError,
     NoNextOtaPartition,
+    CannotFindCurrentBootPartition,
 }
 
 #[derive(Clone)]
@@ -32,7 +33,7 @@ pub struct PartitionInfo {
 }
 
 #[repr(u32)]
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum OtaImgState {
     EspOtaImgNew = 0x0,
     EspOtaImgPendingVerify = 0x1,

@@ -205,6 +205,24 @@ where
         }
     }
 
+    pub fn set_ota_state(&mut self, slot: u8, state: OtaImgState) -> Result<()> {
+        let offset = match slot {
+            1 => self.pinfo.otadata_offset,
+            2 => self.pinfo.otadata_offset + (self.pinfo.otadata_size >> 1),
+            _ => {
+                #[cfg(feature = "log")]
+                log::error!("Use slot1 or slot2!");
+                return Err(OtaError::CannotFindCurrentBootPartition);
+            }
+        };
+
+        _ = self
+            .flash
+            .write(offset + 32 - 4 - 4, &(state as u32).to_le_bytes());
+
+        Ok(())
+    }
+
     /// Returns current OTA boot sequences
     ///
     /// NOTE: if crc doesn't match, it returns 0 for that seq
@@ -234,13 +252,67 @@ where
 
     /// BUG: this wont work if user has ota partitions not starting from ota0
     /// or if user skips some ota partitions: ota0, ota2, ota3...
-    ///
-    /// NOTE: This isn't reading from ota_boot_sequences, maybe in the future
-    /// it will read from them to eliminate possibility of wrong PADDR result.
-    /// (ESP-IDF has if's for PADDR-chain so it can fail somehow)
     pub fn get_next_ota_partition(&self) -> Option<usize> {
         let curr_part = mmu_hal::esp_get_current_running_partition(self.get_partitions());
         curr_part.map(|next_part| (next_part + 1) % self.pinfo.ota_partitions_count)
+    }
+
+    fn get_current_slot(&mut self) -> Result<(u8, EspOtaSelectEntry)> {
+        let (slot1, slot2) = self.get_ota_boot_entries();
+        let current_partition = self
+            .get_currently_booted_partition()
+            .ok_or_else(|| OtaError::CannotFindCurrentBootPartition)?;
+
+        let slot1_part = helpers::seq_to_part(slot1.seq, self.pinfo.ota_partitions_count);
+        let slot2_part = helpers::seq_to_part(slot2.seq, self.pinfo.ota_partitions_count);
+        if current_partition == slot1_part {
+            return Ok((1, slot1));
+        } else if current_partition == slot2_part {
+            return Ok((2, slot2));
+        }
+
+        Err(OtaError::CannotFindCurrentBootPartition)
+    }
+
+    pub fn get_ota_image_state(&mut self) -> Result<OtaImgState> {
+        let (slot1, slot2) = self.get_ota_boot_entries();
+        let current_partition = self
+            .get_currently_booted_partition()
+            .ok_or_else(|| OtaError::CannotFindCurrentBootPartition)?;
+
+        let slot1_part = helpers::seq_to_part(slot1.seq, self.pinfo.ota_partitions_count);
+        let slot2_part = helpers::seq_to_part(slot2.seq, self.pinfo.ota_partitions_count);
+        if current_partition == slot1_part {
+            return Ok(slot1.ota_state);
+        } else if current_partition == slot2_part {
+            return Ok(slot2.ota_state);
+        }
+
+        Err(OtaError::CannotFindCurrentBootPartition)
+    }
+
+    pub fn ota_mark_app_valid(&mut self) -> Result<()> {
+        let (current_slot_nmb, current_slot) = self.get_current_slot()?;
+        if current_slot.ota_state != OtaImgState::EspOtaImgValid {
+            self.set_ota_state(current_slot_nmb, OtaImgState::EspOtaImgValid)?;
+
+            #[cfg(feature = "log")]
+            log::info!("Marked current slot as valid!");
+        }
+
+        Ok(())
+    }
+
+    pub fn ota_mark_app_invalid_rollback(&mut self) -> Result<()> {
+        let (current_slot_nmb, current_slot) = self.get_current_slot()?;
+        if current_slot.ota_state != OtaImgState::EspOtaImgValid {
+            self.set_ota_state(current_slot_nmb, OtaImgState::EspOtaImgInvalid)?;
+
+            #[cfg(feature = "log")]
+            log::info!("Marked current slot as invalid!");
+        }
+
+        Ok(())
     }
 
     fn read_partitions(flash: &mut S) -> Result<PartitionInfo> {
