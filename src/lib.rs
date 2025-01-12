@@ -118,7 +118,8 @@ where
     }
 
     /// verify - should it read flash and check crc
-    pub fn ota_flush(&mut self, verify: bool) -> Result<()> {
+    /// rollback - if rollbacks enable (will set ota_state to ESP_OTA_IMG_NEW)
+    pub fn ota_flush(&mut self, verify: bool, rollback: bool) -> Result<()> {
         if verify {
             if !self.ota_verify()? {
                 #[cfg(feature = "log")]
@@ -144,7 +145,12 @@ where
             return Err(OtaError::WrongCRC);
         }
 
-        self.set_target_ota_boot_partition(progress.target_partition);
+        let img_state = match rollback {
+            true => OtaImgState::EspOtaImgNew,
+            false => OtaImgState::EspOtaImgUndefined,
+        };
+
+        self.set_target_ota_boot_partition(progress.target_partition, img_state);
         Ok(())
     }
 
@@ -178,7 +184,7 @@ where
     }
 
     /// Sets ota boot target partition
-    pub fn set_target_ota_boot_partition(&mut self, target: usize) {
+    pub fn set_target_ota_boot_partition(&mut self, target: usize, state: OtaImgState) {
         let (slot1, slot2) = self.get_ota_boot_entries();
         let (seq1, seq2) = (slot1.seq, slot2.seq);
 
@@ -195,9 +201,14 @@ where
             let offset = self.pinfo.otadata_offset + (self.pinfo.otadata_size >> 1);
 
             _ = flash.write(offset, &target_seq.to_le_bytes());
+            _ = flash.write(offset + 32 - 4 - 4, &(state as u32).to_le_bytes());
             _ = flash.write(offset + 32 - 4, &target_crc.to_le_bytes());
         } else {
             _ = flash.write(self.pinfo.otadata_offset, &target_seq.to_le_bytes());
+            _ = flash.write(
+                self.pinfo.otadata_offset + 32 - 4 - 4,
+                &(state as u32).to_le_bytes(),
+            );
             _ = flash.write(
                 self.pinfo.otadata_offset + 32 - 4,
                 &target_crc.to_le_bytes(),

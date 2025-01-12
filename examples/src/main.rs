@@ -106,6 +106,12 @@ async fn main(spawner: Spawner) {
         .expect("connection spawn");
     spawner.spawn(net_task(stack)).expect("net task spawn");
 
+    // mark ota partition valid
+    {
+        let mut ota = Ota::new(FlashStorage::new()).expect("Cannot create ota");
+        ota.ota_mark_app_valid().unwrap();
+    }
+
     loop {
         log::info!("Wait for wifi!");
         Timer::after(Duration::from_secs(1)).await;
@@ -161,7 +167,7 @@ async fn main(spawner: Spawner) {
 
             match res {
                 Ok(true) => {
-                    let res = ota.ota_flush(false);
+                    let res = ota.ota_flush(false, true);
                     if let Err(e) = res {
                         log::error!("Ota flush error: {e:?}");
                         break;

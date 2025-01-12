@@ -43,7 +43,7 @@ loop {
 
     let res = ota.ota_write_chunk(&buf[..n]);
     if res == Ok(true) { // end of flash
-        if ota.ota_flush(true).is_ok() { // true if you want to verify crc reading flash
+        if ota.ota_flush(true, true).is_ok() { // true if you want to verify crc reading flash, and true if you want rollbacks
             esp_hal::reset::software_reset();
         }
     }
@@ -66,7 +66,7 @@ This will generate .bin file from build file for chip.
 - [x] Simple example
 - [x] Better errors
 - [x] Other esp32's (like esp32c3, esp32s2, etc..)
-- [ ] Rollbacks
+- [x] Rollbacks
 
 ## Resources
 - https://github.com/esp-rs/espflash (this led me to esp-idf-part)
