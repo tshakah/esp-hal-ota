@@ -8,7 +8,6 @@ pub enum OtaError {
     WrongCRC,
     WrongOTAPArtitionOrder,
     OtaVerifyError,
-    NoNextOtaPartition,
     CannotFindCurrentBootPartition,
 }
 

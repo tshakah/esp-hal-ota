@@ -55,9 +55,7 @@ where
 
     /// To begin ota update (need to provide flash size)
     pub fn ota_begin(&mut self, size: u32, target_crc: u32) -> Result<()> {
-        let next_part = self
-            .get_next_ota_partition()
-            .ok_or(OtaError::NoNextOtaPartition)?;
+        let next_part = self.get_next_ota_partition().unwrap_or(0);
 
         let ota_offset = self.get_partitions()[next_part].0;
         self.progress = Some(FlashProgress {
