@@ -2,7 +2,7 @@
 /// Helper funcion!
 /// Change seq to partition number
 pub const fn seq_to_part(seq: u32, partitions_count: usize) -> usize {
-    (seq as usize - 1) % partitions_count
+    ((seq as usize).saturating_sub(1)) % partitions_count
 }
 
 #[inline(always)]

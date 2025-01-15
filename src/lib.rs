@@ -187,6 +187,7 @@ where
         let (seq1, seq2) = (slot1.seq, slot2.seq);
 
         let mut target_seq = seq1.max(seq2);
+        log::info!("{target_seq} {target} {}", self.pinfo.ota_partitions_count);
         while helpers::seq_to_part(target_seq, self.pinfo.ota_partitions_count) != target
             || target_seq == 0
         {

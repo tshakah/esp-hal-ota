@@ -5,10 +5,10 @@
 extern crate alloc;
 use core::str::FromStr;
 use embassy_executor::Spawner;
-use embassy_net::{tcp::TcpSocket, Config, Stack, StackResources};
+use embassy_net::{tcp::TcpSocket, Config, Runner, Stack, StackResources};
 use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
-use esp_hal::{prelude::*, timer::timg::TimerGroup};
+use esp_hal::timer::timg::TimerGroup;
 use esp_hal_ota::Ota;
 use esp_storage::FlashStorage;
 use esp_wifi::{
@@ -37,7 +37,7 @@ macro_rules! mk_static {
     }};
 }
 
-#[main]
+#[esp_hal_embassy::main]
 async fn main(spawner: Spawner) {
     #[cfg(not(feature = "esp32"))]
     {
@@ -91,25 +91,26 @@ async fn main(spawner: Spawner) {
     let config = Config::dhcpv4(Default::default());
     let seed = 69420;
 
-    let stack = &*mk_static!(
-        Stack<WifiDevice<'_, WifiStaDevice>>,
-        Stack::new(
-            wifi_interface,
-            config,
-            mk_static!(StackResources<3>, StackResources::<3>::new()),
-            seed,
-        )
+    let (stack, runner) = embassy_net::new(
+        wifi_interface,
+        config,
+        {
+            static STATIC_CELL: static_cell::StaticCell<StackResources<3>> =
+                static_cell::StaticCell::new();
+            STATIC_CELL.uninit().write(StackResources::<3>::new())
+        },
+        seed,
     );
 
     spawner
         .spawn(connection(controller, stack))
         .expect("connection spawn");
-    spawner.spawn(net_task(stack)).expect("net task spawn");
+    spawner.spawn(net_task(runner)).expect("net task spawn");
 
     // mark ota partition valid
     {
         let mut ota = Ota::new(FlashStorage::new()).expect("Cannot create ota");
-        ota.ota_mark_app_valid().unwrap();
+        _ = ota.ota_mark_app_valid(); //do not unwrap here if using factory/test partition
     }
 
     loop {
@@ -197,10 +198,7 @@ async fn main(spawner: Spawner) {
 }
 
 #[embassy_executor::task]
-async fn connection(
-    mut controller: WifiController<'static>,
-    stack: &'static Stack<WifiDevice<'static, WifiStaDevice>>,
-) {
+async fn connection(mut controller: WifiController<'static>, stack: Stack<'static>) {
     log::info!("start connection task");
     log::info!("Device capabilities: {:?}", controller.capabilities());
     loop {
@@ -242,6 +240,6 @@ async fn connection(
 }
 
 #[embassy_executor::task]
-async fn net_task(stack: &'static Stack<WifiDevice<'static, WifiStaDevice>>) {
-    stack.run().await
+async fn net_task(mut runner: Runner<'static, WifiDevice<'static, WifiStaDevice>>) {
+    runner.run().await
 }
