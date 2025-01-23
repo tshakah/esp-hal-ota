@@ -25,8 +25,6 @@ fn main() {
 
             _ = stream.write_all(chunk);
             _ = stream.read_exact(&mut buf);
-
-            std::thread::sleep(std::time::Duration::from_millis(10));
         }
     }
 }

@@ -152,19 +152,18 @@ async fn main(spawner: Spawner) {
     let mut ota = Ota::new(FlashStorage::new()).expect("Cannot create ota");
     ota.ota_begin(flash_size, target_crc).unwrap();
 
-    let mut bytes_read = 0;
+    let mut bytes_read: usize = 0;
     loop {
-        let res = socket.read(&mut ota_buff).await;
-        if let Ok(n) = res {
-            bytes_read += n;
-            if n == 0 {
+        let bytes_to_read = 8192.min(flash_size - bytes_read as u32);
+        let res = read_exact(&mut socket, &mut ota_buff[..bytes_to_read as usize]).await;
+        if let Ok(_) = res {
+            bytes_read += bytes_to_read as usize;
+            if bytes_to_read == 0 {
                 break;
             }
 
-            let res = ota.ota_write_chunk(&ota_buff[..n]);
-            if bytes_read % 4096 * 2 == 0 {
-                _ = socket.write(&[0]).await;
-            }
+            let res = ota.ota_write_chunk(&ota_buff[..bytes_to_read as usize]);
+            _ = socket.write(&[0]).await;
 
             match res {
                 Ok(true) => {
@@ -187,7 +186,6 @@ async fn main(spawner: Spawner) {
             }
         }
 
-        Timer::after_millis(10).await;
         log::info!("Progress: {}%", (ota.get_ota_progress() * 100.0) as u8);
     }
 
@@ -242,4 +240,20 @@ async fn connection(mut controller: WifiController<'static>, stack: Stack<'stati
 #[embassy_executor::task]
 async fn net_task(mut runner: Runner<'static, WifiDevice<'static, WifiStaDevice>>) {
     runner.run().await
+}
+
+pub async fn read_exact(
+    socket: &mut TcpSocket<'_>,
+    mut buf: &mut [u8],
+) -> Result<(), embassy_net::tcp::Error> {
+    while !buf.is_empty() {
+        match socket.read(buf).await {
+            Ok(0) => return Err(embassy_net::tcp::Error::ConnectionReset),
+            Ok(n) => {
+                buf = &mut buf[n..];
+            }
+            Err(e) => return Err(e),
+        }
+    }
+    Ok(())
 }
