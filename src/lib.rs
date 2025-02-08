@@ -266,7 +266,7 @@ where
         curr_part.map(|next_part| (next_part + 1) % self.pinfo.ota_partitions_count)
     }
 
-    fn get_current_slot(&mut self) -> Result<(u8, EspOtaSelectEntry)> {
+    pub fn get_current_slot(&mut self) -> Result<(u8, EspOtaSelectEntry)> {
         let (slot1, slot2) = self.get_ota_boot_entries();
         let current_partition = self
             .get_currently_booted_partition()
