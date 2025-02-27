@@ -12,10 +12,7 @@ use esp_hal::timer::timg::TimerGroup;
 use esp_hal_ota::Ota;
 use esp_storage::FlashStorage;
 use esp_wifi::{
-    wifi::{
-        ClientConfiguration, Configuration, WifiController, WifiDevice, WifiEvent, WifiStaDevice,
-        WifiState,
-    },
+    wifi::{ClientConfiguration, Configuration, WifiController, WifiDevice, WifiEvent, WifiState},
     EspWifiController,
 };
 
@@ -41,7 +38,7 @@ macro_rules! mk_static {
 async fn main(spawner: Spawner) {
     #[cfg(not(feature = "esp32"))]
     {
-        esp_alloc::heap_allocator!(150 * 1024);
+        esp_alloc::heap_allocator!(size: 150 * 1024);
     }
 
     #[cfg(feature = "esp32")]
@@ -85,14 +82,13 @@ async fn main(spawner: Spawner) {
     esp_hal_embassy::init(timg0.timer0);
 
     let wifi = peripherals.WIFI;
-    let (wifi_interface, controller) =
-        esp_wifi::wifi::new_with_mode(&init, wifi, WifiStaDevice).unwrap();
+    let (controller, interfaces) = esp_wifi::wifi::new(&init, wifi).unwrap();
 
     let config = Config::dhcpv4(Default::default());
     let seed = 69420;
 
     let (stack, runner) = embassy_net::new(
-        wifi_interface,
+        interfaces.sta,
         config,
         {
             static STATIC_CELL: static_cell::StaticCell<StackResources<3>> =
@@ -175,8 +171,7 @@ async fn main(spawner: Spawner) {
 
                     log::info!("Ota OK! Rebooting in 1s!");
                     Timer::after_millis(1000).await;
-                    esp_hal::reset::software_reset();
-                    break;
+                    esp_hal::system::software_reset();
                 }
                 Err(e) => {
                     log::error!("Ota write error: {e:?}");
@@ -238,7 +233,7 @@ async fn connection(mut controller: WifiController<'static>, stack: Stack<'stati
 }
 
 #[embassy_executor::task]
-async fn net_task(mut runner: Runner<'static, WifiDevice<'static, WifiStaDevice>>) {
+async fn net_task(mut runner: Runner<'static, WifiDevice<'static>>) {
     runner.run().await
 }
 

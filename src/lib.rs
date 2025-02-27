@@ -17,8 +17,6 @@ const PART_SIZE: u32 = 0xc00;
 const FIRST_OTA_PART_SUBTYPE: u8 = 0x10;
 const OTA_VERIFY_READ_SIZE: usize = 256;
 
-// NOTE: I need to use generics, because after adding esp-storage dependency to
-// this project its not compiling LULE
 pub struct Ota<S>
 where
     S: ReadStorage + Storage,
