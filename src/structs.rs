@@ -1,6 +1,9 @@
+use postcard_schema::Schema;
+use serde::{Deserialize, Serialize};
+
 pub(crate) type Result<T> = core::result::Result<T, OtaError>;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize, Schema)]
 pub enum OtaError {
     NotEnoughPartitions,
     OtaNotStarted,
@@ -11,7 +14,7 @@ pub enum OtaError {
     CannotFindCurrentBootPartition,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FlashProgress {
     pub last_crc: u32,
     pub flash_offset: u32,
@@ -22,7 +25,7 @@ pub struct FlashProgress {
     pub target_crc: u32,
 }
 
-#[derive(Debug)]
+#[derive(Debug,Clone)]
 pub struct PartitionInfo {
     pub ota_partitions: [(u32, u32); 16],
     pub ota_partitions_count: usize,
@@ -32,7 +35,7 @@ pub struct PartitionInfo {
 }
 
 #[repr(u32)]
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize, Schema)]
 pub enum OtaImgState {
     EspOtaImgNew = 0x0,
     EspOtaImgPendingVerify = 0x1,
@@ -43,7 +46,7 @@ pub enum OtaImgState {
 }
 
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Clone, Debug, Deserialize, Serialize, Schema)]
 pub struct EspOtaSelectEntry {
     pub seq: u32,
     pub seq_label: [u8; 20],
