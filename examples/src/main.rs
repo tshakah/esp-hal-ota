@@ -5,15 +5,15 @@
 extern crate alloc;
 use core::str::FromStr;
 use embassy_executor::Spawner;
-use embassy_net::{tcp::TcpSocket, Config, Runner, Stack, StackResources};
+use embassy_net::{Config, Runner, Stack, StackResources, tcp::TcpSocket};
 use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::timer::timg::TimerGroup;
 use esp_hal_ota::Ota;
 use esp_storage::FlashStorage;
 use esp_wifi::{
-    wifi::{ClientConfiguration, Configuration, WifiController, WifiDevice, WifiEvent, WifiState},
     EspWifiController,
+    wifi::{ClientConfiguration, Configuration, WifiController, WifiDevice, WifiEvent, WifiState},
 };
 
 const WIFI_SSID: &'static str = env!("SSID");
@@ -45,17 +45,19 @@ async fn main(spawner: Spawner) {
     {
         static mut HEAP: core::mem::MaybeUninit<[u8; 30 * 1024]> = core::mem::MaybeUninit::uninit();
 
-        #[link_section = ".dram2_uninit"]
+        #[unsafe(link_section = ".dram2_uninit")]
         static mut HEAP2: core::mem::MaybeUninit<[u8; 64 * 1024]> =
             core::mem::MaybeUninit::uninit();
 
         unsafe {
+            #[allow(static_mut_refs)]
             esp_alloc::HEAP.add_region(esp_alloc::HeapRegion::new(
                 HEAP.as_mut_ptr() as *mut u8,
                 core::mem::size_of_val(&*core::ptr::addr_of!(HEAP)),
                 esp_alloc::MemoryCapability::Internal.into(),
             ));
 
+            #[allow(static_mut_refs)]
             esp_alloc::HEAP.add_region(esp_alloc::HeapRegion::new(
                 HEAP2.as_mut_ptr() as *mut u8,
                 core::mem::size_of_val(&*core::ptr::addr_of!(HEAP2)),

@@ -16,7 +16,7 @@ embassy-executor = { version = "0.7.0", package = "embassy-executor", features =
 embassy-net = { version = "0.7.0", features = ["tcp", "udp", "dhcpv4", "medium-ethernet"] }
 embassy-time = { version = "0.4.0" }
 esp-storage = { version = "0.6.0", features = [] }
-esp-hal-ota = { path = "/home/pilif/projects/esp-hal-ota", features = [] }
+esp-hal-ota = { path = "/home/pilif/projects/esp-hal-ota", features = ["log"] }
 static_cell = { version = "2.1.0", features = ["nightly"] }
 #xtensa-lx-rt = { version = "0.17.2", optional = true, features = ["esp32s3", "float-save-restore"] }
 esp-alloc = "0.8.0"
